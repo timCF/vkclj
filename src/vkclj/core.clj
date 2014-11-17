@@ -14,6 +14,9 @@
     (json/write-str ~body)
     (catch Exception ~'e {:error (str "caught exception while encoding: " (.getMessage ~'e))})))
 
+(defmacro get_response [something]
+  `(get-in ~something ["response"]))
+
 ;; request template
 (defmacro vkreq [funcname method handler]
   (let [fullhttp (str "https://api.vk.com/method/" method)]
@@ -23,26 +26,38 @@
                     {:status 200 :body ~'body}
                     (match (decode ~'body)
                            {:error ~'error} {:error ~'error}
-                           ~'some (~handler ~'some))
-                    ~'answer {:error (str "query result " ~'answer)}))
+                           ~'some (match (get_response ~'some)
+                                         nil {:error ~'some}
+                                         ~'ans (~handler ~'ans)))
+                    ~'answer {:error {:http_res ~'answer}}))
             ([]
              (match @(http/get ~fullhttp)
                     {:status 200 :body ~'body}
                     (match (decode ~'body)
                            {:error ~'error} {:error ~'error}
-                           ~'some (~handler ~'some))
-                    ~'answer {:error (str "query result " ~'answer)})))))
+                           ~'some (match (get_response ~'some)
+                                         nil {:error ~'some}
+                                         ~'ans (~handler ~'ans)))
+                    ~'answer {:error {:http_res ~'answer}})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;  public API functions  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+; {}
 (vkreq gettime "getServerTime"
-       (fn [some_map]
-         (match (get-in some_map ["response"])
-                (some_int :guard integer?) some_int
-                some_else {:error (str "got unexpected value " some_else)})))
-;(vkreq getphotos "photos.get")
+       (fn [some_int]
+         (case (integer? some_int)
+           true some_int
+           false {:error {:from_vk some_int}})))
+
+; {:owner_id -gid :aid aid}
+(vkreq getphotos "photos.get"
+       (fn [lst]
+         (cond
+           (vector? lst) lst
+           (list? lst) (vec lst)
+           :else {:error {:from_vk lst}})))
 ;(vkreq delphoto "photos.delete")
 ;(vkreq send_message "messages.send")
 
