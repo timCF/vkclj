@@ -51,15 +51,30 @@
            true some_int
            false {:error {:from_vk some_int}})))
 
-; {:owner_id -gid :aid aid}
+; {:owner_id -gid :aid aid :access_token token}
 (vkreq getphotos "photos.get"
        (fn [lst]
          (cond
            (vector? lst) lst
            (list? lst) (vec lst)
            :else {:error {:from_vk lst}})))
-;(vkreq delphoto "photos.delete")
-;(vkreq send_message "messages.send")
+
+; {:oid -gid :pid pid :access_token token}
+(vkreq delphoto "photos.delete"
+       (fn [some_int]
+         (case (= some_int 1)
+           true :ok
+           false {:error {:from_vk some_int}})))
+
+; {:uid uid :message message :access_token token}
+(vkreq send_message "messages.send"
+       (fn [some_int]
+         (case (integer? some_int)
+           true :ok
+           false {:error {:from_vk some_int}})))
+
+; {:gid gid :aid aid :photo_path photo_path}
+(defn upload_photo [])
 
 (def token "29888b63ab3627919a4e3f27eb6abf81fde006575dcd5d65b944626585503db1737288c8fbd1d67f56719")
 
