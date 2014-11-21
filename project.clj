@@ -8,5 +8,5 @@
                   [org.clojure/data.json "0.2.5"]
                   [http-kit "2.1.16"]
                   [org.clojure/core.match "0.2.1"]
-                  [defun "0.2.0-RC"]
+                  [pmclj "0.1.0-SNAPSHOT"]
                  ])
