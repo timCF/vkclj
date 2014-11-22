@@ -1,6 +1,7 @@
 (ns vkclj.core
   (:require [clojure.data.json :as json])
   (:require [org.httpkit.client :as http])
+  (:require [clj-http.client :as http2])
   (:use [clojure.core.match :only (match)])
   (:use [defun :only [defun]])
   (:use [pmclj.core :only [key_not_matching pred_matching]]))
@@ -16,7 +17,7 @@
 
 (defmacro decode [body]
   `(try
-    (json/read-str ~body)
+    (json/read-str ~body :key-fn keyword)
     (catch Exception ~'e {:error (str "caught exception while decoding: " (.getMessage ~'e))})))
 (defmacro encode [body]
   `(try
@@ -26,7 +27,7 @@
 ;; chain macro
 
 (defmacro get_response [some_map]
-  `(let [res# (get-in ~some_map ["response"])]
+  `(let [res# (get-in ~some_map [:response])]
     (case (= nil res#)
       true {:error ~some_map}
       res#)))
@@ -74,17 +75,18 @@
      (catch Exception e# {:error (str "caught exception while reading file " ~file_path (.getMessage e#))})))
 
 (vkreq __getupserv__ "photos.getUploadServer" [:aid :access_token] some_map
-       (let [res (get-in some_map ["upload_url"])]
+       (let [res (get-in some_map [:upload_url])]
          (case (string? res)
            true res
            false {:error {:from_vk some_map}})))
 
 (defn __upload_photo_process__ [{upload_url :upload_url file_content :file_content}]
-  (match @(http/post upload_url {:headers {"Content-Type" "multipart/form-data"} :multipart {:name "file1" :content file_content }})
+  (match (http2/post upload_url {:headers {"Content-Type" "multipart/form-data"} :multipart [{:name "file1"
+                                                                                              :content file_content
+                                                                                              :mime-type "image/jpeg"}]})
          {:status 200 :body body}
             (key_not_matching :error
-                              (decode body)
-                              (get_response)
+                              (decode (show_it body))
                               (match {:server server :photos_list photos_list :aid aid :hash hash} {:server server :photos_list photos_list :aid aid :hash hash}
                                      some_else {:error {:from_vk some_else}}))
          answer {:error {:http_res answer}}))
@@ -121,14 +123,18 @@
 
 (defun upload_photo
        ([{:gid gid :aid aid :photo_path photo_path :access_token token}]
-        (pred_matching (fn [resmap] (->> (vals resmap) (every? #(= nil (get-in % [:error])))))
+        (pred_matching (fn [resmap] (and (->> (vals resmap) (every? #(= nil (get-in % [:error]))))
+                                         (every? #(not= :error %) (keys resmap))))
                        {:file_content (read_file photo_path)}
                        ((fn [res] (merge res {:upload_url (__getupserv__ {:gid gid :aid aid :access_token token})})))
                        (__upload_photo_process__)
+                       ((fn [res] (assoc res :access_token token)))
                        (__savephotos__)))
        ([{:aid aid :photo_path photo_path :access_token token}]
-        (pred_matching (fn [resmap] (->> (vals resmap) (every? #(= nil (get-in % [:error])))))
+        (pred_matching (fn [resmap] (and (->> (vals resmap) (every? #(= nil (get-in % [:error]))))
+                                         (every? #(not= :error %) (keys resmap))))
                        {:file_content (read_file photo_path)}
                        ((fn [res] (merge res {:upload_url (__getupserv__ {:aid aid :access_token token})})))
                        (__upload_photo_process__)
+                       ((fn [res] (assoc res :access_token token)))
                        (__savephotos__))))
