@@ -1,7 +1,6 @@
 (ns vkclj.core
   (:require [clojure.data.json :as json])
-  (:require [org.httpkit.client :as http])
-  (:require [clj-http.client :as http2])
+  (:require [clj-http.client :as http])
   (:use [clojure.core.match :only (match)])
   (:use [defun :only [defun]])
   (:use [pmclj.core :only [key_not_matching pred_matching]]))
@@ -49,7 +48,7 @@
   (let [fullhttp (str "https://api.vk.com/method/" method)]
     (case key_list
       [] `(defn ~funcname []
-            (match @(http/get ~fullhttp)
+            (match (http/get ~fullhttp)
                    {:status 200 :body body#}
                       (key_not_matching :error
                                         (decode body#)
@@ -57,7 +56,7 @@
                                         (final_handler ~result_symbol ~handler))
                    answer# {:error {:http_res answer#}}))
       `(defn ~funcname [real_args#] (case (check_args real_args# ~key_list) true
-            (match @(http/get ~fullhttp {:query-params real_args#})
+            (match (http/get ~fullhttp {:query-params real_args# })
                    {:status 200 :body body#}
                       (key_not_matching :error
                                         (decode body#)
@@ -70,9 +69,10 @@
 ;;
 
 (defmacro read_file [file_path]
-  `(try
-     (slurp ~file_path)
-     (catch Exception e# {:error (str "caught exception while reading file " ~file_path (.getMessage e#))})))
+  `(let [file# (clojure.java.io/as-file ~file_path)]
+     (case (.exists file#)
+       true file#
+       false {:error (str "File " ~file_path " is not exist.")})))
 
 (vkreq __getupserv__ "photos.getUploadServer" [:aid :access_token] some_map
        (let [res (get-in some_map [:upload_url])]
@@ -81,17 +81,15 @@
            false {:error {:from_vk some_map}})))
 
 (defn __upload_photo_process__ [{upload_url :upload_url file_content :file_content}]
-  (match (http2/post upload_url {:headers {"Content-Type" "multipart/form-data"} :multipart [{:name "file1"
-                                                                                              :content file_content
-                                                                                              :mime-type "image/jpeg"}]})
+  (match (http/post upload_url { :multipart [{:name "file1" :content file_content}]})
          {:status 200 :body body}
             (key_not_matching :error
-                              (decode (show_it body))
+                              (decode body)
                               (match {:server server :photos_list photos_list :aid aid :hash hash} {:server server :photos_list photos_list :aid aid :hash hash}
                                      some_else {:error {:from_vk some_else}}))
          answer {:error {:http_res answer}}))
 
-(vkreq __savephotos__ "photos.save" [:aid :server :photos_list :hash :access_token] lst
+(vkreq __savephotos__ "photos.save" [:aid :server :photos_list :hash :access_token :caption] lst
        (case (or (list? lst) (vector? lst))
          true :ok
          false {:error {:from_vk lst}}))
@@ -122,19 +120,19 @@
          false {:error {:from_vk some_int}}))
 
 (defun upload_photo
-       ([{:gid gid :aid aid :photo_path photo_path :access_token token}]
+       ([{:gid gid :aid aid :photo_path photo_path :caption caption :access_token token}]
         (pred_matching (fn [resmap] (and (->> (vals resmap) (every? #(= nil (get-in % [:error]))))
                                          (every? #(not= :error %) (keys resmap))))
                        {:file_content (read_file photo_path)}
                        ((fn [res] (merge res {:upload_url (__getupserv__ {:gid gid :aid aid :access_token token})})))
                        (__upload_photo_process__)
-                       ((fn [res] (assoc res :access_token token)))
+                       ((fn [res] (merge res {:access_token token :caption caption :gid gid})))
                        (__savephotos__)))
-       ([{:aid aid :photo_path photo_path :access_token token}]
+       ([{:aid aid :photo_path photo_path :caption caption :access_token token}]
         (pred_matching (fn [resmap] (and (->> (vals resmap) (every? #(= nil (get-in % [:error]))))
                                          (every? #(not= :error %) (keys resmap))))
                        {:file_content (read_file photo_path)}
                        ((fn [res] (merge res {:upload_url (__getupserv__ {:aid aid :access_token token})})))
                        (__upload_photo_process__)
-                       ((fn [res] (assoc res :access_token token)))
+                       ((fn [res] (merge res {:access_token token :caption caption})))
                        (__savephotos__))))

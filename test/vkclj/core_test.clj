@@ -14,8 +14,8 @@
 
 (deftest upload_photo_test1
   (testing "upload_photo_test1"
-    (is (= :ok (upload_photo {:gid 63990445 :aid 194932313 :photo_path "./IMG_0496.JPG" :access_token token})))))
+    (is (= :ok (upload_photo {:gid 64104734 :aid 185287475 :photo_path "./main.jpg" :caption "test" :access_token token})))))
 
 (deftest upload_photo_test2
   (testing "upload_photo_test2"
-    (is (= :ok (upload_photo {:aid 206579664 :photo_path "./main.jpg" :access_token token})))))
+    (is (= :ok (upload_photo {:aid 206579664 :photo_path "./main.jpg" :caption "test" :access_token token})))))
