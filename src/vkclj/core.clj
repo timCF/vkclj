@@ -5,6 +5,13 @@
   (:use [defun :only [defun]])
   (:use [pmclj.core :only [key_not_matching pred_matching]]))
 
+;; macro for debug
+
+(defmacro show_it [expr]
+  `(let [res# ~expr]
+     (println res#)
+     res#))
+
 ;; work with jsons
 
 (defmacro decode [body]
@@ -73,7 +80,7 @@
            false {:error {:from_vk some_map}})))
 
 (defn __upload_photo_process__ [{upload_url :upload_url file_content :file_content}]
-  (match @(http/post upload_url {:headers {"Content-Type" "multipart/form-data"} :multipart {:name "file1" :content file_content}})
+  (match @(http/post upload_url {:headers {"Content-Type" "multipart/form-data"} :multipart {:name "file1" :content file_content }})
          {:status 200 :body body}
             (key_not_matching :error
                               (decode body)
@@ -116,12 +123,12 @@
        ([{:gid gid :aid aid :photo_path photo_path :access_token token}]
         (pred_matching (fn [resmap] (->> (vals resmap) (every? #(= nil (get-in % [:error])))))
                        {:file_content (read_file photo_path)}
-                       (fn [res] (merge res {:upload_url (__getupserv__ {:gid gid :aid aid :access_token token})}))
+                       ((fn [res] (merge res {:upload_url (__getupserv__ {:gid gid :aid aid :access_token token})})))
                        (__upload_photo_process__)
                        (__savephotos__)))
        ([{:aid aid :photo_path photo_path :access_token token}]
         (pred_matching (fn [resmap] (->> (vals resmap) (every? #(= nil (get-in % [:error])))))
                        {:file_content (read_file photo_path)}
-                       (fn [res] (merge res {:upload_url (__getupserv__ {:aid aid :access_token token})}))
+                       ((fn [res] (merge res {:upload_url (__getupserv__ {:aid aid :access_token token})})))
                        (__upload_photo_process__)
                        (__savephotos__))))
