@@ -3,7 +3,7 @@
   (:require [clj-http.client :as http])
   (:use [clojure.core.match :only (match)])
   (:use [defun :only [defun]])
-  (:use [pmclj.core :only [key_not_matching pred_matching]]))
+  (:use [pmclj.core :only [key_not_matching rkey_not_matching]]))
 
 ;; macro for debug
 
@@ -121,18 +121,16 @@
 
 (defun upload_photo
        ([{:gid gid :aid aid :photo_path photo_path :caption caption :access_token token}]
-        (pred_matching (fn [resmap] (and (->> (vals resmap) (every? #(= nil (get-in % [:error]))))
-                                         (every? #(not= :error %) (keys resmap))))
-                       {:file_content (read_file photo_path)}
-                       ((fn [res] (merge res {:upload_url (__getupserv__ {:gid gid :aid aid :access_token token})})))
-                       (__upload_photo_process__)
-                       ((fn [res] (merge res {:access_token token :caption caption :gid gid})))
-                       (__savephotos__)))
+        (rkey_not_matching :error
+                           {:file_content (read_file photo_path)}
+                           ((fn [res] (merge res {:upload_url (__getupserv__ {:gid gid :aid aid :access_token token})})))
+                           (__upload_photo_process__)
+                           ((fn [res] (merge res {:access_token token :caption caption :gid gid})))
+                           (__savephotos__)))
        ([{:aid aid :photo_path photo_path :caption caption :access_token token}]
-        (pred_matching (fn [resmap] (and (->> (vals resmap) (every? #(= nil (get-in % [:error]))))
-                                         (every? #(not= :error %) (keys resmap))))
-                       {:file_content (read_file photo_path)}
-                       ((fn [res] (merge res {:upload_url (__getupserv__ {:aid aid :access_token token})})))
-                       (__upload_photo_process__)
-                       ((fn [res] (merge res {:access_token token :caption caption})))
-                       (__savephotos__))))
+        (rkey_not_matching :error
+                           {:file_content (read_file photo_path)}
+                           ((fn [res] (merge res {:upload_url (__getupserv__ {:aid aid :access_token token})})))
+                           (__upload_photo_process__)
+                           ((fn [res] (merge res {:access_token token :caption caption})))
+                           (__savephotos__))))
