@@ -12,6 +12,8 @@
      (println res#)
      res#))
 
+(def token "20ae6c1b3a945bf492b985e23371ca925e7897979ce036491878edf123c0f33f5b2b245d912e6bb6f02b3")
+
 ;; work with jsons
 
 (defmacro decode [body]
@@ -134,3 +136,41 @@
                            (__upload_photo_process__)
                            ((fn [res] (merge res {:access_token token :caption caption})))
                            (__savephotos__))))
+(vkreq get_friends_uids "friends.get" [:uid :access_token] lst
+       (case (vector? lst)
+         true (case (every? #(integer? %) lst)
+                true lst
+                false {:error {:from_vk lst}})
+         false {:error {:from_vk lst}}))
+
+;;
+;; for inner usage
+;;
+
+(vkreq __get_group_members_proc__ "groups.getMembers" [:gid :count :offset :access_token] some_map
+       (case (map? some_map)
+         false {:error {:from_vk some_map}}
+         true (let [users (:users some_map)]
+                (case (vector? users)
+                  false {:error {:from_vk some_map}}
+                  true (case (every? #(integer? %) users)
+                         false {:error {:from_vk some_map}}
+                         true users)))))
+(def get_members_limit 1000)
+(defun get_group_members
+       ([{:gid gid :access_token access_token :res prevres}]
+         (Thread/sleep 100)
+         (let [result (__get_group_members_proc__ {:gid gid
+                                                   :count get_members_limit
+                                                   :offset (count prevres)
+                                                   :access_token access_token})]
+           (match result
+                  [] prevres
+                  (_ :guard vector?) (get_group_members {:gid gid
+                                                         :access_token access_token
+                                                         :res (vec (concat prevres result))})
+                  _ result)))
+       ([{:gid gid :access_token access_token}]
+         (get_group_members {:gid gid
+                             :access_token access_token
+                             :res []})))
