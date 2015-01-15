@@ -174,3 +174,121 @@
          (get_group_members {:gid gid
                              :access_token access_token
                              :res []})))
+;;
+;; uids here - string, joined "," ids (1000 or less, not "")
+;;
+
+(def user_info_fields   [
+                         :sex,
+                         :bdate,
+                         :city,
+                         :country,
+                         :photo_50,
+                         :photo_100,
+                         :photo_200_orig,
+                         :photo_200,
+                         :photo_400_orig,
+                         :photo_max,
+                         :photo_max_orig,
+                         :photo_id,
+                         :online,
+                         :online_mobile,
+                         :domain,
+                         :has_mobile,
+                         :contacts,
+                         :connections,
+                         :site,
+                         :education,
+                         :universities,
+                         :schools,
+                         :can_post,
+                         :can_see_all_posts,
+                         :can_see_audio,
+                         :can_write_private_message,
+                         :status,
+                         :last_seen,
+                         :common_count,
+                         :relation,
+                         :relatives,
+                         :counters,
+                         :screen_name,
+                         :maiden_name,
+                         :timezone,
+                         :occupation,
+                         :activities,
+                         :interests,
+                         :music,
+                         :movies,
+                         :tv,
+                         :books,
+                         :games,
+                         :about,
+                         :quotes,
+                         :personal
+                        ])
+(def user_info_fields_main [:uid, :first_name, :last_name])
+(defn __parse_user__ [some_map]
+  (case (map? some_map)
+    false :failed
+    true (case (every? #(let [el (% some_map)] (or (integer? el) (string? el))) user_info_fields_main )
+           false :failed
+           true (reduce #(assoc %1 %2 (%2 some_map)) {} user_info_fields))))
+(vkreq __users_info_inner__ "users.get" [:uids :fields :access_token] lst
+       (case (vector? lst)
+         false {:error {:from_vk lst}}
+         true (->> (map __parse_user__ lst)
+                   (filter #(not= % :failed)))))
+(defn __users_info__ [{lst :uids access_token :access_token}]
+  (__users_info_inner__ {:fields (clojure.string/join "," (map name user_info_fields))
+                         :uids (clojure.string/join "," lst)
+                         :access_token access_token}))
+(defun users_info
+       ([{:uids (lst :guard vector?) :access_token access_token}]
+         (case (every? integer? lst)
+           false {:error (str "expected list of ints, got : " lst)}
+           true (users_info {:res []
+                             :rest lst
+                             :access_token access_token})))
+       ([{:res res :rest rest :access_token access_token}]
+         (let [tmp (split-at 1000 rest)]
+           (let [lst_todo (first tmp) lst_rest (second tmp)]
+             (let [finres (vec (concat (__users_info__ {:uids lst_todo
+                                                        :access_token access_token})
+                                       res))]
+               (case (= lst_rest ())
+                 true finres
+                 false (users_info {:res finres
+                                    :rest (vec lst_rest)
+                                    :access_token access_token})))))))
+
+(def search_users_fields
+   [
+    :q,
+    :city,
+    :country,
+    :hometown,
+    :university_country,
+    :university,
+    :university_year,
+    :university_faculty,
+    :university_chair,
+    :sex,
+    :status,
+    :age_from,
+    :age_to,
+    :birth_day,
+    :birth_month,
+    :birth_year,
+    :online,
+    :has_photo,
+    :school_country,
+    :school_city,
+    :school_class,
+    :school,
+    :school_year,
+    :religion,
+    :interests,
+    :company,
+    :position,
+    :group_id
+   ])
