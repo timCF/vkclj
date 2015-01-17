@@ -159,7 +159,7 @@
 (def get_members_limit 1000)
 (defun get_group_members
        ([{:gid gid :access_token access_token :res prevres}]
-         (Thread/sleep 100)
+         (Thread/sleep 500)
          (let [result (__get_group_members_proc__ {:gid gid
                                                    :count get_members_limit
                                                    :offset (count prevres)
@@ -179,6 +179,22 @@
 ;;
 
 (def user_info_fields   [
+                         :uid,
+                         :id,
+                         :first_name,
+                         :last_name,
+                         :deactivated,
+                         :hidden,
+                         :verified,
+                         :blacklisted,
+                         :home_town,
+                         :lists,
+                         :followers_count,
+                         :nickname,
+                         :exports,
+                         :wall_comments,
+                         :can_send_friend_request,
+                         :is_favorite,
                          :sex,
                          :bdate,
                          :city,
@@ -233,14 +249,15 @@
     true (case (every? #(let [el (% some_map)] (or (integer? el) (string? el))) user_info_fields_main )
            false :failed
            true (reduce #(assoc %1 %2 (%2 some_map)) {} user_info_fields))))
-(vkreq __users_info_inner__ "users.get" [:uids :fields :access_token] lst
+(vkreq __users_info_inner__ "users.get" [:user_ids :fields :access_token] lst
        (case (vector? lst)
          false {:error {:from_vk lst}}
          true (->> (map __parse_user__ lst)
-                   (filter #(not= % :failed)))))
+                   (filter #(not= % :failed))
+                   (vec))))
 (defn __users_info__ [{lst :uids access_token :access_token}]
   (__users_info_inner__ {:fields (clojure.string/join "," (map name user_info_fields))
-                         :uids (clojure.string/join "," lst)
+                         :user_ids (clojure.string/join "," lst)
                          :access_token access_token}))
 (defun users_info
        ([{:uids (lst :guard vector?) :access_token access_token}]
@@ -250,16 +267,18 @@
                              :rest lst
                              :access_token access_token})))
        ([{:res res :rest rest :access_token access_token}]
-         (let [tmp (split-at 1000 rest)]
-           (let [lst_todo (first tmp) lst_rest (second tmp)]
-             (let [finres (vec (concat (__users_info__ {:uids lst_todo
-                                                        :access_token access_token})
-                                       res))]
-               (case (= lst_rest ())
-                 true finres
-                 false (users_info {:res finres
-                                    :rest (vec lst_rest)
-                                    :access_token access_token})))))))
+         (Thread/sleep 500)
+         (match (split-at 250 rest) [lst_todo lst_rest]
+                (match (__users_info__ {:uids lst_todo :access_token access_token})
+                       (finres :guard vector?)
+                          (case (= lst_rest ())
+                            true finres
+                            false (->> (users_info {:res finres
+                                                    :rest (vec lst_rest)
+                                                    :access_token access_token})
+                                       (concat res)
+                                       (vec)))
+                       some_error {:error some_error}))))
 
 (def search_users_fields
    [
